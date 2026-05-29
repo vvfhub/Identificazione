@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Badge QR System</title>
+<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,wght@0,400;0,700;0,900;1,400&display=swap');
+
+:root {
+  --ink: #1a1410;
+  --paper: #f5f0e8;
+  --cream: #ede7d5;
+  --gold: #c4922a;
+  --gold-light: #e8b84b;
+  --red: #c0392b;
+  --green: #1e7b4b;
+  --border: #c8b99a;
+  --muted: #8a7b65;
+  --white: #fdfaf4;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: 'Fraunces', Georgia, serif;
+  min-height: 100vh;
+}
+
+.tab-bar {
+  background: var(--ink);
+  display: flex;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 16px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  border-bottom: 3px solid transparent;
+}
+
+.tab-btn.active { color: var(--gold-light); border-bottom-color: var(--gold-light); }
+.tab-btn:hover:not(.active) { color: var(--paper); }
+
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+h1 { font-size: 1.8rem; font-weight: 900; line-height: 1.1; color: var(--ink); }
+
+h2 {
+  font-size: 0.8rem; font-weight: 700; color: var(--ink);
+  font-family: 'DM Mono', monospace; letter-spacing: 0.05em; text-transform: uppercase;
+}
+
+.section-header {
+  padding: 24px 20px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--white);
+}
+
+.section-header p {
+  font-size: 0.85rem; color: var(--muted); margin-top: 4px; font-family: 'DM Mono', monospace;
+}
+
+/* GENERATOR */
+.gen-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+
+.field-group {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.field-group label {
+  display: block; padding: 10px 14px 6px;
+  font-family: 'DM Mono', monospace; font-size: 0.68rem; font-weight: 500;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+  border-bottom: 1px solid var(--cream);
+}
+
+textarea, input[type=text] {
+  width: 100%; padding: 10px 14px; background: transparent; border: none; outline: none;
+  font-family: 'DM Mono', monospace; font-size: 0.8rem; color: var(--ink); line-height: 1.6; resize: vertical;
+}
+
+textarea { min-height: 160px; }
+
+.event-row { display: flex; gap: 10px; }
+.event-row .field-group { flex: 1; }
+
+.btn-primary {
+  width: 100%; padding: 14px; background: var(--ink); color: var(--gold-light);
+  border: none; border-radius: 4px; font-family: 'DM Mono', monospace; font-size: 0.8rem;
+  font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer; transition: all 0.15s;
+}
+.btn-primary:hover { background: #2d2620; }
+
+.btn-secondary {
+  flex: 1; padding: 12px; background: transparent; color: var(--ink);
+  border: 2px solid var(--border); border-radius: 4px; font-family: 'DM Mono', monospace;
+  font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: all 0.15s;
+}
+.btn-secondary:hover { border-color: var(--ink); }
+
+#previewArea { display: none; flex-direction: column; gap: 14px; margin-top: 4px; }
+
+.preview-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 14px; background: var(--green); border-radius: 4px; color: #fff;
+}
+.preview-header span { font-family: 'DM Mono', monospace; font-size: 0.75rem; }
+
+.badges-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.badge-card {
+  background: var(--white); border: 1.5px solid var(--border); border-radius: 6px;
+  padding: 10px 10px; text-align: center; cursor: pointer; transition: all 0.15s;
+}
+.badge-card:hover { border-color: var(--gold); box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+
+.badge-card canvas { width: 120px !important; height: 120px !important; display: block; margin: 6px auto; }
+
+.badge-name { font-family: 'Fraunces', serif; font-weight: 700; font-size: 0.85rem; color: var(--ink); line-height: 1.2; }
+.badge-id { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--muted); margin-top: 3px; }
+.badge-event { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--gold); margin-bottom: 2px; text-transform: uppercase; letter-spacing: 0.05em; }
+
+.btn-row { display: flex; gap: 8px; }
+
+@media print {
+  .tab-bar, .btn-row, .preview-header, .btn-primary, .field-group, .event-row { display: none !important; }
+  .badges-grid { grid-template-columns: repeat(3, 1fr); gap: 8mm; }
+  .badge-card { border: 1px solid #ccc; page-break-inside: avoid; }
+  body { background: white; }
+  #tab-generator { display: block !important; }
+  #previewArea { display: flex !important; }
+}
+
+/* SCANNER */
+.scan-body { display: flex; flex-direction: column; }
+
+.camera-container {
+  position: relative;
+  width: 100%;
+  background: #000;
+  aspect-ratio: 4/3;
+  overflow: hidden;
+}
+
+#video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.result-overlay {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; pointer-events: none; opacity: 0;
+}
+.result-overlay.show { animation: overlayFade 1.8s ease forwards; }
+@keyframes overlayFade { 0% { opacity:1; } 65% { opacity:1; } 100% { opacity:0; } }
+.result-overlay.ok   { background: rgba(30,123,75,0.9); }
+.result-overlay.fail { background: rgba(192,57,43,0.9); }
+.result-overlay.dup  { background: rgba(196,146,42,0.9); }
+.result-icon { font-size: 3.5rem; line-height: 1; }
+.result-name {
+  font-family: 'Fraunces', serif; font-weight: 900; font-size: 1.5rem; color: #fff;
+  text-align: center; padding: 0 16px; line-height: 1.2; margin-top: 8px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.result-sub {
+  font-family: 'DM Mono', monospace; font-size: 0.7rem; color: rgba(255,255,255,0.85);
+  margin-top: 6px; letter-spacing: 0.05em; text-transform: uppercase;
+}
+
+.scan-btn-row { display: flex; gap: 8px; }
+.scan-btn-row button {
+  flex: 1; padding: 10px; border: none; border-radius: 4px;
+  font-family: 'DM Mono', monospace; font-size: 0.72rem; font-weight: 500;
+  letter-spacing: 0.06em; text-transform: uppercase; cursor: pointer; transition: all 0.15s;
+}
+#startBtn { background: var(--ink); color: var(--gold-light); }
+#startBtn:disabled { background: #ccc; color: #999; cursor: default; }
+#stopBtn { background: transparent; border: 1.5px solid var(--border); color: var(--ink); }
+#stopBtn:hover { border-color: var(--red); color: var(--red); }
+
+.result-overlay {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; pointer-events: none; opacity: 0;
+}
+.result-overlay.show { animation: overlayFade 1.8s ease forwards; }
+
+@keyframes overlayFade { 0% { opacity:1; } 65% { opacity:1; } 100% { opacity:0; } }
+
+.result-overlay.ok  { background: rgba(30, 123, 75, 0.9); }
+.result-overlay.fail { background: rgba(192, 57, 43, 0.9); }
+.result-overlay.dup  { background: rgba(196, 146, 42, 0.9); }
+
+.result-icon { font-size: 3.5rem; line-height: 1; }
+.result-name {
+  font-family: 'Fraunces', serif; font-weight: 900; font-size: 1.5rem; color: #fff;
+  text-align: center; padding: 0 16px; line-height: 1.2; margin-top: 8px;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.result-sub { font-family: 'DM Mono', monospace; font-size: 0.7rem; color: rgba(255,255,255,0.85); margin-top: 6px; letter-spacing: 0.05em; text-transform: uppercase; }
+
+.scan-controls { padding: 14px 16px; background: var(--white); border-bottom: 1px solid var(--border); }
+
+.scan-status { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+
+.pulse-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+.pulse-dot.live { background: var(--green); animation: blink 1s ease infinite; }
+.pulse-dot.ok   { background: var(--green); }
+.pulse-dot.fail { background: var(--red); }
+
+@keyframes blink { 0%,100% { opacity:1; } 50% { opacity:0.2; } }
+
+#statusMsg { font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted); flex: 1; }
+
+
+
+#lastResult { margin: 14px 16px; display: none; background: var(--white); border: 1.5px solid var(--border); border-radius: 6px; overflow: hidden; }
+.lr-top { padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+.lr-icon { font-size: 2rem; }
+.lr-info { flex: 1; min-width: 0; }
+.lr-name { font-family: 'Fraunces', serif; font-weight: 900; font-size: 1.1rem; line-height: 1.2; }
+.lr-name.ok { color: var(--green); }
+.lr-name.fail { color: var(--red); }
+.lr-name.dup  { color: var(--gold); }
+.lr-detail { font-family: 'DM Mono', monospace; font-size: 0.68rem; color: var(--muted); margin-top: 3px; }
+.lr-code { font-family: 'DM Mono', monospace; font-size: 0.65rem; padding: 6px 16px; background: var(--cream); color: var(--muted); border-top: 1px solid var(--border); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.log-panel { padding: 0 16px 16px; }
+.log-title { display: flex; align-items: center; justify-content: space-between; padding: 12px 0 8px; border-top: 1px solid var(--border); }
+.log-title h2 { font-size: 0.68rem; color: var(--muted); }
+.log-counters { display: flex; gap: 10px; }
+.lc { font-family: 'DM Mono', monospace; font-size: 0.68rem; }
+.lc.ok { color: var(--green); }
+.lc.fail { color: var(--red); }
+
+.log-list { display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
+.log-list::-webkit-scrollbar { width: 3px; }
+.log-list::-webkit-scrollbar-thumb { background: var(--border); }
+
+.log-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--white); border: 1px solid var(--border); border-radius: 3px; animation: slideIn 0.2s ease; }
+@keyframes slideIn { from { opacity:0; transform:translateY(-4px); } to { opacity:1; transform:translateY(0); } }
+.li-icon { font-size: 0.8rem; }
+.li-name { flex: 1; font-family: 'Fraunces', serif; font-size: 0.8rem; font-weight: 700; }
+.li-name.ok   { color: var(--green); }
+.li-name.fail { color: var(--red); }
+.li-name.dup  { color: var(--gold); }
+.li-time { font-family: 'DM Mono', monospace; font-size: 0.6rem; color: var(--muted); }
+
+.empty-log { text-align: center; padding: 20px; font-family: 'DM Mono', monospace; font-size: 0.72rem; color: var(--muted); border: 1px dashed var(--border); border-radius: 4px; }
+
+/* PRIVACY TAB */
+.privacy-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 700px;
+}
+
+.priv-card {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 16px;
+  border-radius: 6px;
+  border: 1.5px solid var(--border);
+}
+
+.priv-card.accent {
+  background: #eef7f2;
+  border-color: var(--green);
+}
+
+.priv-card.muted {
+  background: var(--cream);
+  border-color: var(--border);
+}
+
+.priv-card .priv-icon { font-size: 1.6rem; flex-shrink: 0; margin-top: 2px; }
+
+.priv-card h3 {
+  font-family: 'Fraunces', serif;
+  font-weight: 700;
+  font-size: 1rem;
+  color: var(--green);
+  margin-bottom: 6px;
+}
+
+.priv-card p {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.priv-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border: 1.5px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--white);
+}
+
+.priv-section h2 {
+  padding: 12px 16px;
+  background: var(--ink);
+  color: var(--gold-light);
+  font-family: 'DM Mono', monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.priv-item {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--cream);
+}
+
+.priv-item:last-child { border-bottom: none; }
+
+.priv-label {
+  display: inline-block;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--gold);
+  margin-bottom: 6px;
+}
+
+.priv-item p {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+</style>
+</head>
+<body>
+
+<div class="tab-bar">
+  <button class="tab-btn active" id="tabGenBtn" onclick="switchTab('generator', this)">⊞ Genera Badge</button>
+  <button class="tab-btn" id="tabScanBtn" onclick="switchTab('scanner', this)">⊙ Scansiona</button>
+  <button class="tab-btn" id="tabPrivBtn" onclick="switchTab('privacy', this)">⚖ Privacy</button>
+</div>
+
+<!-- GENERATOR -->
+<div id="tab-generator" class="tab-content active">
+  <div class="section-header">
+    <h1>Genera Badge QR</h1>
+    <p>Inserisci i nominativi → ottieni un badge QR per ognuno → stampa</p>
+  </div>
+  <div class="gen-body">
+    <div class="event-row">
+      <div class="field-group">
+        <label>Nome Evento</label>
+        <input type="text" id="eventName" placeholder="es. Convegno 2025" value="Evento 2025">
+      </div>
+      <div class="field-group">
+        <label>Data</label>
+        <input type="text" id="eventDate" placeholder="es. 15/06/2025">
+      </div>
+    </div>
+    <div class="field-group">
+      <label>Giorno Autorizzato</label>
+      <select id="allowedDay" style="width:100%;padding:10px 14px;background:transparent;border:none;outline:none;font-family:'DM Mono',monospace;font-size:0.8rem;color:var(--ink);cursor:pointer;">
+        <option value="">Tutti i giorni</option>
+        <option value="Lunedì">Lunedì</option>
+        <option value="Martedì">Martedì</option>
+        <option value="Mercoledì">Mercoledì</option>
+        <option value="Giovedì">Giovedì</option>
+        <option value="Venerdì">Venerdì</option>
+        <option value="Sabato">Sabato</option>
+        <option value="Domenica">Domenica</option>
+      </select>
+    </div>
+    <div class="field-group">
+      <label>Elenco Partecipanti — un nome per riga</label>
+      <textarea id="nameList" placeholder="Mario Rossi&#10;Giulia Bianchi&#10;Luca Verdi&#10;...">Mario Rossi
+Giulia Bianchi
+Luca Verdi
+Anna Ferrari
+Carlo Esposito</textarea>
+    </div>
+    <button class="btn-primary" onclick="generateBadges()">⊞ GENERA BADGE QR</button>
+
+    <div id="previewArea">
+      <div class="preview-header">
+        <span id="previewCount">0 badge generati</span>
+        <span style="font-size:0.65rem;opacity:0.8">Clicca un badge per scaricarlo</span>
+      </div>
+      <div class="btn-row">
+        <button class="btn-secondary" onclick="window.print()">🖨 STAMPA TUTTI</button>
+        <button class="btn-secondary" onclick="exportCSV()">↓ ESPORTA CSV</button>
+      </div>
+      <div class="badges-grid" id="badgesGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SCANNER -->
+<div id="tab-scanner" class="tab-content">
+  <div class="section-header">
+    <h1>Scansiona Badge</h1>
+    <p>Leggi i QR code — il nome verrà mostrato istantaneamente</p>
+  </div>
+  <div class="scan-body">
+
+    <div class="camera-container">
+      <video id="video" autoplay muted playsinline></video>
+      <div class="result-overlay" id="resultOverlay">
+        <div class="result-icon" id="resIcon"></div>
+        <div class="result-name" id="resName"></div>
+        <div class="result-sub" id="resSub"></div>
+      </div>
+    </div>
+
+    <div class="scan-controls">
+      <div class="scan-status">
+        <div class="pulse-dot" id="pulseDot"></div>
+        <span id="statusMsg">Premi Avvia per accendere la camera.</span>
+      </div>
+      <div class="scan-btn-row">
+        <button id="startBtn" onclick="startCamera()">▶ Avvia Camera</button>
+        <button id="stopBtn" onclick="stopCamera()">■ Stop</button>
+      </div>
+    </div>
+
+    <div id="lastResult">
+      <div class="lr-top">
+        <div class="lr-icon" id="lrIcon"></div>
+        <div class="lr-info">
+          <div class="lr-name" id="lrName"></div>
+          <div class="lr-detail" id="lrDetail"></div>
+        </div>
+      </div>
+      <div class="lr-code" id="lrCode"></div>
+    </div>
+
+    <div class="log-panel">
+      <div class="log-title">
+        <h2>Scansioni sessione</h2>
+        <div class="log-counters">
+          <span class="lc ok">✓ <span id="cntOk">0</span></span>
+          <span class="lc fail">✗ <span id="cntFail">0</span></span>
+        </div>
+      </div>
+      <div class="log-list" id="logList">
+        <div class="empty-log" id="emptyLog">Nessuna scansione ancora.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────
+var badges = {};
+var camStream = null;
+var scanning = false;
+var lastScan = '', lastScanTime = 0;
+var cntOk = 0, cntFail = 0;
+var scannedSet = new Set();
+
+// ── TABS ───────────────────────────────────────────
+function switchTab(tabId, btn) {
+  document.querySelectorAll('.tab-content').forEach(function(el) { el.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(el) { el.classList.remove('active'); });
+  document.getElementById('tab-' + tabId).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── GENERATOR ─────────────────────────────────────
+function generateBadges() {
+  var rawText = document.getElementById('nameList').value;
+  var names = rawText.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
+  var eventVal = document.getElementById('eventName').value.trim() || 'Evento';
+  var dateVal = document.getElementById('eventDate').value.trim();
+  var allowedDay = document.getElementById('allowedDay').value.trim();
+
+  if (names.length === 0) { alert('Inserisci almeno un nominativo.'); return; }
+
+  // Reset completo
+  badges = {};
+  var grid = document.getElementById('badgesGrid');
+  grid.innerHTML = '';
+
+  names.forEach(function(name, i) {
+    var id = 'P' + String(i + 1).padStart(3, '0');
+    var payload = JSON.stringify({ id: id, name: name, event: eventVal, date: dateVal, day: allowedDay });
+    badges[id] = { name: name, eventVal: eventVal, dateVal: dateVal, allowedDay: allowedDay, payload: payload };
+
+    // Crea canvas QR tramite QRious
+    var qrCanvas = document.createElement('canvas');
+    qrCanvas.setAttribute('data-id', id);
+    new QRious({
+      element: qrCanvas,
+      value: payload,
+      size: 150,
+      foreground: '#1a1410',
+      background: '#fdfaf4',
+      level: 'M'
+    });
+
+    // Crea card
+    var card = document.createElement('div');
+    card.className = 'badge-card';
+    card.title = 'Clicca per scaricare';
+
+    var evEl = document.createElement('div');
+    evEl.className = 'badge-event';
+    evEl.textContent = eventVal + (dateVal ? ' · ' + dateVal : '') + (allowedDay ? ' · ' + allowedDay : '');
+
+    var nameEl = document.createElement('div');
+    nameEl.className = 'badge-name';
+    nameEl.textContent = name;
+
+    var idEl = document.createElement('div');
+    idEl.className = 'badge-id';
+    idEl.textContent = id;
+
+    card.appendChild(evEl);
+    card.appendChild(qrCanvas);
+    card.appendChild(nameEl);
+    card.appendChild(idEl);
+
+    // Chiusura corretta per il click
+    (function(capturedId) {
+      card.onclick = function() { downloadBadge(capturedId); };
+    })(id);
+
+    grid.appendChild(card);
+  });
+
+  document.getElementById('previewCount').textContent = names.length + ' badge generati';
+  document.getElementById('previewArea').style.display = 'flex';
+}
+
+function downloadBadge(id) {
+  var b = badges[id];
+  if (!b) return;
+  var srcCanvas = document.querySelector('canvas[data-id="' + id + '"]');
+  if (!srcCanvas) return;
+
+  var c = document.createElement('canvas');
+  c.width = 300; c.height = 370;
+  var ctx = c.getContext('2d');
+
+  ctx.fillStyle = '#fdfaf4';
+  ctx.fillRect(0, 0, 300, 370);
+  ctx.strokeStyle = '#c8b99a';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(3, 3, 294, 364);
+
+  ctx.fillStyle = '#1a1410';
+  ctx.fillRect(0, 0, 300, 38);
+  ctx.fillStyle = '#e8b84b';
+  ctx.font = 'bold 11px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText((b.eventVal + (b.dateVal ? '  ·  ' + b.dateVal : '')).toUpperCase(), 150, 24);
+
+  ctx.drawImage(srcCanvas, 75, 48, 150, 150);
+
+  ctx.fillStyle = '#1a1410';
+  ctx.font = 'bold 20px serif';
+  ctx.fillText(b.name, 150, 230);
+
+  ctx.fillStyle = '#8a7b65';
+  ctx.font = '11px monospace';
+  ctx.fillText(id, 150, 250);
+
+  ctx.strokeStyle = '#c8b99a';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(20, 266); ctx.lineTo(280, 266); ctx.stroke();
+
+  ctx.fillStyle = '#8a7b65';
+  ctx.font = '9px monospace';
+  ctx.fillText('BADGE UFFICIALE — ' + b.eventVal.toUpperCase(), 150, 284);
+
+  var a = document.createElement('a');
+  a.href = c.toDataURL('image/png');
+  a.download = 'badge_' + b.name.replace(/\s+/g, '_') + '_' + id + '.png';
+  a.click();
+}
+
+function exportCSV() {
+  var rows = [['ID', 'Nome', 'Evento', 'Data']];
+  Object.keys(badges).forEach(function(id) {
+    var b = badges[id];
+    rows.push([id, b.name, b.eventVal, b.dateVal]);
+  });
+  var csv = rows.map(function(r) { return r.map(function(v) { return '"' + v + '"'; }).join(','); }).join('\n');
+  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  var a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'partecipanti.csv';
+  a.click();
+}
+
+// ── SCANNER ───────────────────────────────────────
+var zxingReader = null;
+var scanning = false;
+var lastScan = '', lastScanTime = 0;
+
+function startCamera() {
+  if (scanning) return;
+  document.getElementById('startBtn').disabled = true;
+  setStatus('live', 'Avvio camera...');
+
+  zxingReader = new ZXing.BrowserQRCodeReader();
+
+  zxingReader.decodeFromVideoDevice(
+    undefined,
+    'video',
+    function(result, err) {
+      if (result) {
+        var now = Date.now();
+        if (result.text !== lastScan || now - lastScanTime > 2800) {
+          lastScan = result.text;
+          lastScanTime = now;
+          handleScan(result.text);
+        }
+      }
+      // err è normale quando nessun QR è inquadrato, si ignora
+    }
+  ).then(function() {
+    scanning = true;
+    setStatus('live', 'Scansione attiva — inquadra il badge.');
+  }).catch(function(e) {
+    document.getElementById('startBtn').disabled = false;
+    setStatus('', 'Errore camera: ' + (e.message || e));
+  });
+}
+
+function stopCamera() {
+  if (zxingReader) {
+    zxingReader.reset();
+    zxingReader = null;
+  }
+  scanning = false;
+  document.getElementById('startBtn').disabled = false;
+  setStatus('', 'Camera fermata.');
+}
+
+function handleScan(raw) {
+  var parsed = null;
+  try { parsed = JSON.parse(raw); } catch(e) {}
+
+  var isDup = scannedSet.has(raw);
+  scannedSet.add(raw);
+
+  var name, detail, scanId, type, icon;
+
+  if (parsed && parsed.name) {
+    name = parsed.name;
+    scanId = parsed.id || '';
+    var evLabel = parsed.event ? parsed.event + (parsed.date ? ' · ' + parsed.date : '') : '';
+    // Controlla giorno autorizzato
+    var allowedDayQR = parsed.day || '';
+    var todayName = ['Domenica','Lunedì','Martedì','Mercoledì','Giovedì','Venerdì','Sabato'][new Date().getDay()];
+    var wrongDay = allowedDayQR && allowedDayQR !== todayName;
+
+    if (isDup) {
+      type = 'dup'; icon = '⚠️';
+      detail = 'Già scansionato' + (evLabel ? ' — ' + evLabel : '');
+    } else if (wrongDay) {
+      type = 'fail'; icon = '🚫';
+      detail = 'Autorizzato solo ' + allowedDayQR + ' — oggi è ' + todayName;
+    } else {
+      type = 'ok'; icon = '✅';
+      detail = (scanId ? scanId + ' — ' : '') + (allowedDayQR ? 'Autorizzato: ' + allowedDayQR : evLabel || 'Badge valido');
+    }
+  } else {
+    name = isDup ? 'Già letto' : 'Codice sconosciuto';
+    type = isDup ? 'dup' : 'fail';
+    icon = isDup ? '⚠️' : '❌';
+    detail = raw.length > 50 ? raw.substring(0, 47) + '...' : raw;
+  }
+
+  // Overlay
+  var ov = document.getElementById('resultOverlay');
+  document.getElementById('resIcon').textContent = icon;
+  document.getElementById('resName').textContent = name;
+  document.getElementById('resSub').textContent = type === 'ok' ? '✓ ACCESSO CONFERMATO' : type === 'dup' ? '⚠ GIÀ SCANSIONATO' : type === 'fail' && wrongDay ? '🚫 GIORNO NON VALIDO' : '✗ NON RICONOSCIUTO';
+  ov.className = 'result-overlay ' + type + ' show';
+  setTimeout(function() { ov.className = 'result-overlay'; }, 1800);
+
+  // Card
+  var lr = document.getElementById('lastResult');
+  lr.style.display = 'block';
+  document.getElementById('lrIcon').textContent = icon;
+  var lrNameEl = document.getElementById('lrName');
+  lrNameEl.textContent = name;
+  lrNameEl.className = 'lr-name ' + type;
+  document.getElementById('lrDetail').textContent = detail;
+  document.getElementById('lrCode').textContent = 'RAW: ' + (raw.length > 60 ? raw.substring(0,57)+'...' : raw);
+
+  if (type === 'ok')   { cntOk++;   document.getElementById('cntOk').textContent = cntOk; }
+  if (type === 'fail') { cntFail++; document.getElementById('cntFail').textContent = cntFail; }
+
+  // Log
+  var emptyLog = document.getElementById('emptyLog');
+  if (emptyLog) emptyLog.remove();
+
+  var now2 = new Date();
+  var tStr = now2.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  var item = document.createElement('div');
+  item.className = 'log-item';
+  item.innerHTML = '<span class="li-icon">' + icon + '</span>'
+    + '<span class="li-name ' + type + '">' + escHtml(name) + '</span>'
+    + '<span class="li-time">' + tStr + '</span>';
+  var logList = document.getElementById('logList');
+  logList.insertBefore(item, logList.firstChild);
+
+  setStatus(
+    type === 'ok' ? 'ok' : type === 'fail' ? 'fail' : 'live',
+    type === 'ok'   ? '✓ ' + name + ' — accesso OK' :
+    type === 'dup'  ? '⚠ ' + name + ' — già scansionato' :
+    wrongDay        ? '🚫 ' + name + ' — non autorizzato oggi (' + todayName + ')' :
+                     '✗ Codice non riconosciuto'
+  );
+}
+
+function setStatus(state, msg) {
+  document.getElementById('statusMsg').textContent = msg;
+  var d = document.getElementById('pulseDot');
+  d.className = 'pulse-dot' + (state ? ' ' + state : '');
+}
+
+function escHtml(s) {
+  if (!s) return '';
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+
+<!-- PRIVACY -->
+<div id="tab-privacy" class="tab-content">
+  <div class="section-header">
+    <h1>Privacy & Disclaimer</h1>
+    <p>Informativa sul trattamento dei dati e termini d'uso</p>
+  </div>
+  <div class="privacy-body">
+
+    <div class="priv-card accent">
+      <div class="priv-icon">🔒</div>
+      <div>
+        <h3>Nessun dato viene trasmesso</h3>
+        <p>Questa applicazione funziona interamente sul tuo dispositivo. Nessuna informazione — nomi, immagini, scansioni — viene inviata a server esterni o terze parti.</p>
+      </div>
+    </div>
+
+    <div class="priv-section">
+      <h2>Informativa Privacy</h2>
+
+      <div class="priv-item">
+        <span class="priv-label">Dati inseriti</span>
+        <p>I nominativi dei partecipanti inseriti nella scheda "Genera Badge" vengono utilizzati esclusivamente per generare i QR code e rimangono in memoria solo durante la sessione attiva. Alla chiusura del browser o al ricaricamento della pagina, tutti i dati vengono eliminati automaticamente.</p>
+      </div>
+
+      <div class="priv-item">
+        <span class="priv-label">Fotocamera</span>
+        <p>L'accesso alla fotocamera viene richiesto esclusivamente per la funzione di scansione dei QR code. Il flusso video non viene registrato, salvato né trasmesso. L'accesso termina non appena si preme "Stop" o si chiude la pagina.</p>
+      </div>
+
+      <div class="priv-item">
+        <span class="priv-label">Scansioni effettuate</span>
+        <p>Il log delle scansioni (nomi letti e orari) è visibile solo a schermo durante la sessione corrente. Non viene salvato in nessun archivio locale o remoto. Chiudendo l'app il log viene perso.</p>
+      </div>
+
+      <div class="priv-item">
+        <span class="priv-label">Cookie e tracciamento</span>
+        <p>L'applicazione non utilizza cookie, tecnologie di tracciamento, analytics né pubblicità di alcun tipo.</p>
+      </div>
+
+      <div class="priv-item">
+        <span class="priv-label">Dati nei QR code</span>
+        <p>Ogni QR code stampato contiene: nome del partecipante, identificativo progressivo, nome dell'evento, data e giorno autorizzato. Questi dati sono leggibili da qualsiasi lettore QR standard. Si raccomanda di trattare i badge stampati con la stessa cura riservata a qualsiasi documento contenente dati personali, in conformità con il Regolamento UE 2016/679 (GDPR).</p>
+      </div>
+
+      <div class="priv-item">
+        <span class="priv-label">Librerie esterne</span>
+        <p>L'app carica due librerie JavaScript da CDN pubbliche (jsQR e QRious) necessarie al funzionamento. Queste librerie non raccolgono dati personali. La connessione avviene solo al primo caricamento della pagina.</p>
+      </div>
+    </div>
+
+    <div class="priv-section">
+      <h2>Disclaimer</h2>
+
+      <div class="priv-item">
+        <span class="priv-label">Uso previsto</span>
+        <p>Questa applicazione è uno strumento di supporto per il controllo accessi a eventi. La responsabilità dell'utilizzo corretto, della gestione dei badge stampati e del trattamento dei dati personali dei partecipanti ricade interamente sull'organizzatore dell'evento.</p>
+      </div>
+
+      <div class="priv-item">
+        <span class="priv-label">Limitazioni</span>
+        <p>L'app non garantisce sicurezza assoluta contro la contraffazione dei badge. Il QR code contiene informazioni in chiaro: chiunque disponga di un lettore QR può leggerne il contenuto. Per eventi che richiedono un controllo accessi ad alto livello di sicurezza si raccomanda l'adozione di soluzioni dedicate con firma digitale o crittografia.</p>
+      </div>
+
+      <div class="priv-item">
+        <span class="priv-label">Conformità GDPR</span>
+        <p>L'organizzatore che utilizza questa app per gestire nominativi di persone fisiche è da considerarsi titolare del trattamento ai sensi del GDPR. È responsabilità dell'organizzatore raccogliere il consenso necessario dai partecipanti prima di inserirne i dati nell'applicazione e stamparne i badge.</p>
+      </div>
+
+      <div class="priv-item">
+        <span class="priv-label">Responsabilità</span>
+        <p>Lo sviluppatore dell'applicazione non è responsabile per eventuali danni diretti o indiretti derivanti dall'uso o dall'impossibilità di utilizzo dello strumento. L'app è fornita "così com'è", senza garanzie di continuità del servizio.</p>
+      </div>
+    </div>
+
+    <div class="priv-card muted">
+      <div class="priv-icon">📋</div>
+      <div>
+        <p>Per qualsiasi domanda relativa al trattamento dei dati personali, fare riferimento al responsabile della privacy dell'organizzazione che utilizza questa applicazione.</p>
+        <p style="margin-top:8px;font-size:0.7rem;opacity:0.7;">Ultimo aggiornamento: 29/05/2026</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+</body>
+</html>
